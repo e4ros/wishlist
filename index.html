@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wishlist Wheel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f5fa;--surface:#fff;--ink:#14213d;--muted:#56627e;--line:#d3dbea;--accent:#f4a300;--rim:#14213d;--seg-ink:#10182b;--seg-line:#ffffff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1120;--surface:#151d33;--ink:#eaf0ff;--muted:#9aa8c8;--line:#28345a;--rim:#2b3a66;--seg-line:#151d33;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1120;--surface:#151d33;--ink:#eaf0ff;--muted:#9aa8c8;--line:#28345a;--rim:#2b3a66;--seg-line:#151d33;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45}
+.app{max-width:1040px;margin:0 auto;padding:22px 16px 36px;display:grid;gap:24px}
+header{grid-column:1/-1}
+h1{margin:0;font-size:clamp(1.9rem,6vw,3rem);font-weight:800;letter-spacing:-.03em;line-height:1}
+header p{margin:8px 0 0;color:var(--muted);max-width:46ch}
+.stage{display:flex;flex-direction:column;align-items:center;gap:20px}
+.wheelbox{width:100%;max-width:520px;aspect-ratio:1}
+canvas{width:100%;height:100%;display:block}
+.btn{font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:2px solid var(--ink);border-radius:10px;padding:9px 16px;cursor:pointer}
+.btn:hover{background:var(--line)}
+.btn:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.spin{font-size:1.25rem;font-weight:800;letter-spacing:.04em;background:var(--accent);color:#1a1200;border-radius:999px;padding:14px 56px;box-shadow:0 5px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+.spin:hover{background:var(--accent)}
+.spin:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.spin:disabled{opacity:.55;cursor:not-allowed}
+.side{display:grid;gap:20px;min-width:0}
+.card{background:var(--surface);border:2px solid var(--ink);border-radius:14px;padding:16px;display:flex;gap:16px;align-items:center}
+.card[hidden]{display:none}
+.tile{position:relative;flex:none;width:96px;height:96px;border-radius:10px;overflow:hidden;display:grid;place-items:center;font-size:2.6rem;font-weight:800;color:var(--seg-ink);border:2px solid var(--ink)}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--surface)}
+.info{min-width:0}
+.info h2{margin:0;font-size:1.25rem;line-height:1.2;overflow-wrap:anywhere}
+.price{margin:6px 0 0;font-size:1.5rem;font-weight:800}
+.asin{margin:4px 0 0;color:var(--muted);font-size:.85rem}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{from{transform:scale(.94);opacity:.4}to{transform:none;opacity:1}}
+.data label{display:block;font-weight:600;margin-bottom:6px}
+textarea{width:100%;min-height:170px;resize:vertical;font:.82rem/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:10px;padding:10px}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+#status{margin:10px 0 0;min-height:1.4em;font-size:.92rem;color:var(--muted)}
+#status.err{color:#c0392b}
+@media (prefers-color-scheme:dark){#status.err{color:#ff8a7a}}
+.help{border:2px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.help summary{cursor:pointer;font-weight:600}
+.help summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.help ol{margin:10px 0;padding-left:20px;color:var(--muted)}
+.help li{margin:4px 0}
+#bm{min-height:96px;font-size:.75rem}
+#bmstatus{align-self:center;color:var(--muted);font-size:.9rem}
+@media (min-width:860px){.app{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none}.spin{transition:none}}
+</style>
+</head>
+<body>
+<main class="app">
+<header>
+<h1>Wishlist Wheel</h1>
+<p>Paste your wishlist items, spin the wheel, and see what lands under the pointer.</p>
+</header>
+
+<section class="stage" aria-label="Wheel">
+<div class="wheelbox"><canvas id="wheel" role="img" aria-label="Prize wheel"></canvas></div>
+<button class="btn spin" id="spin" type="button">SPIN</button>
+</section>
+
+<section class="side">
+<div id="result" aria-live="polite">
+<div class="card" id="card" hidden>
+<div class="tile" id="tile"></div>
+<div class="info"><h2 id="rtitle"></h2><p class="price" id="rprice"></p><p class="asin" id="rasin"></p></div>
+</div>
+</div>
+<div class="data">
+<label for="json">Items (JSON array)</label>
+<textarea id="json" spellcheck="false" placeholder='[{"title": "", "asin": "", "price": "", "image": ""}]'></textarea>
+<div class="row">
+<button class="btn" id="build" type="button">Build wheel</button>
+<button class="btn" id="paste" type="button">Paste JSON</button>
+<button class="btn" id="sample" type="button">Load sample items</button>
+</div>
+<p id="status" role="status"></p>
+</div>
+<details class="help">
+<summary>Import from Amazon</summary>
+<ol>
+<li>Set your wishlist to Public or Shared.</li>
+<li>In a desktop browser, create a new bookmark and paste the bookmarklet below as its URL.</li>
+<li>Open your wishlist on amazon.com and click that bookmark. It scrolls to load every item, then copies the JSON. Wait for the confirmation alert.</li>
+<li>Come back here and press Paste JSON.</li>
+</ol>
+<textarea id="bm" readonly spellcheck="false" aria-label="Bookmarklet code"></textarea>
+<div class="row"><button class="btn" id="copybm" type="button">Copy bookmarklet</button><span id="bmstatus" role="status"></span></div>
+<p id="bmnote" style="color:var(--muted);font-size:.9rem;margin:10px 0 0">If the alert says no items were found, Amazon has changed its page markup and the selectors need updating.</p>
+</details>
+</section>
+</main>
+
+<script>
+(function(){
+var $=function(id){return document.getElementById(id)};
+var TAU=Math.PI*2, MAX=40;
+var cv=$("wheel"), ctx=cv.getContext("2d");
+var items=[], colors=[], angle=0, spinning=false, size=400;
+var reduce=window.matchMedia("(prefers-reduced-motion: reduce)");
+
+var SAMPLE=[
+{title:"Cast-iron skillet, 10 inch",asin:"B000SAMPL1",price:"$24.99",image:""},
+{title:"Mechanical keyboard, tactile switches",asin:"B000SAMPL2",price:"$89.00",image:""},
+{title:"Noise-cancelling headphones",asin:"B000SAMPL3",price:"$199.95",image:""},
+{title:"Trail running shoes",asin:"B000SAMPL4",price:"$129.00",image:""},
+{title:"Burr coffee grinder",asin:"B000SAMPL5",price:"$59.50",image:""},
+{title:"Weighted blanket, 15 lb",asin:"B000SAMPL6",price:"$69.99",image:""},
+{title:"Pocket projector",asin:"B000SAMPL7",price:"$149.00",image:""},
+{title:"Pour-over coffee kit",asin:"B000SAMPL8",price:"$34.00",image:""}
+];
+
+function status(msg,err){var s=$("status");s.textContent=msg;s.className=err?"err":""}
+function palette(n){var a=[];for(var i=0;i<n;i++)a.push("hsl("+((i*137.5+20)%360).toFixed(1)+" 68% 62%)");return a}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+
+function resize(){
+var w=cv.clientWidth||400, dpr=window.devicePixelRatio||1;
+size=w; cv.width=Math.round(w*dpr); cv.height=Math.round(w*dpr);
+ctx.setTransform(dpr,0,0,dpr,0,0); draw();
+}
+
+function draw(){
+ctx.clearRect(0,0,size,size);
+var cx=size/2, cy=size/2, R=size/2-16, n=items.length;
+var rim=css("--rim"), accent=css("--accent"), line=css("--seg-line"), ink=css("--seg-ink"), surf=css("--surface"), muted=css("--muted");
+if(!n){
+ctx.beginPath();ctx.arc(cx,cy,R,0,TAU);ctx.fillStyle=surf;ctx.fill();
+ctx.lineWidth=8;ctx.strokeStyle=rim;ctx.stroke();
+ctx.fillStyle=muted;ctx.textAlign="center";ctx.textBaseline="middle";
+ctx.font="600 "+Math.max(14,size*.04)+"px 'Bricolage Grotesque',system-ui,sans-serif";
+ctx.fillText("Build the wheel to begin",cx,cy);
+}else{
+var seg=TAU/n, hubR=R*.13;
+var fs=Math.max(9,Math.min(17,R*seg*.28));
+for(var i=0;i<n;i++){
+var a0=angle+i*seg;
+ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,a0,a0+seg);ctx.closePath();
+ctx.fillStyle=colors[i];ctx.fill();
+ctx.lineWidth=2;ctx.strokeStyle=line;ctx.stroke();
+}
+ctx.textBaseline="middle";ctx.textAlign="right";
+ctx.font="600 "+fs+"px 'Bricolage Grotesque',system-ui,sans-serif";
+var maxW=R-16-hubR-10;
+for(var j=0;j<n;j++){
+ctx.save();ctx.translate(cx,cy);ctx.rotate(angle+j*seg+seg/2);
+var t=items[j].title;
+if(ctx.measureText(t).width>maxW){
+while(t.length>1&&ctx.measureText(t+"…").width>maxW)t=t.slice(0,-1);
+t=t.trimEnd()+"…";
+}
+ctx.fillStyle=ink;ctx.fillText(t,R-16,0);ctx.restore();
+}
+ctx.beginPath();ctx.arc(cx,cy,R,0,TAU);ctx.lineWidth=8;ctx.strokeStyle=rim;ctx.stroke();
+ctx.beginPath();ctx.arc(cx,cy,hubR,0,TAU);ctx.fillStyle=accent;ctx.fill();ctx.lineWidth=4;ctx.strokeStyle=rim;ctx.stroke();
+}
+ctx.beginPath();ctx.moveTo(cx-15,cy-R-10);ctx.lineTo(cx+15,cy-R-10);ctx.lineTo(cx,cy-R+18);ctx.closePath();
+ctx.fillStyle=accent;ctx.fill();ctx.lineWidth=3;ctx.lineJoin="round";ctx.strokeStyle=rim;ctx.stroke();
+}
+
+function winner(a){
+var n=items.length, seg=TAU/n;
+var rel=((-Math.PI/2-a)%TAU+TAU)%TAU;
+return Math.floor(rel/seg)%n;
+}
+
+function show(i){
+var it=items[i], tile=$("tile");
+tile.textContent=it.title.charAt(0).toUpperCase();
+tile.style.background=colors[i];
+if(/^(https?:|data:image\/)/i.test(it.image)){
+var img=document.createElement("img");
+img.alt="";img.referrerPolicy="no-referrer";
+img.onerror=function(){img.remove()};
+img.src=it.image;tile.appendChild(img);
+}
+$("rtitle").textContent=it.title;
+$("rprice").textContent=it.price||"";
+$("rasin").textContent=it.asin?"ASIN "+it.asin:"";
+var card=$("card");card.hidden=false;
+card.classList.remove("pop");void card.offsetWidth;card.classList.add("pop");
+}
+
+function spin(){
+if(spinning||!items.length)return;
+spinning=true;$("spin").disabled=true;$("card").hidden=true;
+var start=angle, total=TAU*(6+Math.floor(Math.random()*3))+Math.random()*TAU;
+var dur=reduce.matches?1200:5200, t0=performance.now();
+function frame(now){
+var p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,4);
+angle=start+total*e;draw();
+if(p<1){requestAnimationFrame(frame)}
+else{angle=angle%TAU;draw();spinning=false;$("spin").disabled=false;show(winner(angle))}
+}
+requestAnimationFrame(frame);
+}
+
+function build(){
+if(spinning)return;
+try{
+var d=JSON.parse($("json").value);
+if(!Array.isArray(d)||!d.length)throw new Error("Paste a JSON array with at least one item.");
+var clean=d.slice(0,MAX).map(function(x){x=x||{};return{
+title:String(x.title||"").trim(),asin:String(x.asin||"").trim(),
+price:String(x.price||"").trim(),image:String(x.image||"").trim()}})
+.filter(function(x){return x.title});
+if(!clean.length)throw new Error("Each item needs a title.");
+items=clean;colors=palette(items.length);angle=0;$("card").hidden=true;
+status("Wheel ready with "+items.length+" item"+(items.length>1?"s":"")+(d.length>MAX?" (first "+MAX+" used).":"."));
+draw();
+}catch(e){
+status(e instanceof SyntaxError?"That isn’t valid JSON. Check for missing commas or quotes.":e.message,true);
+}
+}
+
+$("spin").addEventListener("click",spin);
+$("build").addEventListener("click",build);
+$("sample").addEventListener("click",function(){$("json").value=JSON.stringify(SAMPLE,null,2);build()});
+
+$("paste").addEventListener("click",function(){
+if(!navigator.clipboard||!navigator.clipboard.readText){status("Clipboard reading isn’t available here. Paste into the box, then press Build wheel.",true);$("json").focus();return}
+navigator.clipboard.readText().then(function(t){
+if(!t.trim()){status("The clipboard is empty.",true);return}
+$("json").value=t;build();
+}).catch(function(){status("Couldn’t read the clipboard. Paste into the box, then press Build wheel.",true);$("json").focus()});
+});
+
+var BM=["javascript:(async()=>{",
+"var q=function(e,s){return e.querySelector(s)};",
+"var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};",
+"var last=0,same=0;",
+"while(same<4){window.scrollTo(0,document.body.scrollHeight);await sleep(900);var n=document.querySelectorAll('li[data-itemid]').length;if(n===last){same++}else{same=0;last=n}if(q(document,'#endOfListMarker')){break}}",
+"window.scrollTo(0,0);",
+"var out=[],seen={};",
+"document.querySelectorAll('li[data-itemid]').forEach(function(li){",
+"var asin=li.getAttribute('data-asin')||'';",
+"if(!asin){try{var p=JSON.parse(li.getAttribute('data-reposition-action-params')||'{}');var x=p.itemExternalId||'';if(x.indexOf('ASIN:')>-1){asin=x.split('ASIN:')[1].slice(0,10)}}catch(e){}}",
+"var a=q(li,'a[id^=itemName_]')||q(li,'a[href*=\"/dp/\"]');",
+"if(!asin&&a&&a.href.indexOf('/dp/')>-1){asin=a.href.split('/dp/')[1].slice(0,10)}",
+"var title=a?(a.getAttribute('title')||a.textContent).trim():'';",
+"var pe=q(li,'[id^=itemPrice_] .a-offscreen');",
+"var dp=li.getAttribute('data-price');",
+"var price=pe?pe.textContent.trim():(dp&&dp.charAt(0)!=='-'?'$'+dp:'');",
+"var im=q(li,'img');",
+"var key=asin||title;",
+"if(title&&!seen[key]){seen[key]=1;out.push({title:title,asin:asin,price:price,image:im?im.src:''})}",
+"});",
+"if(!out.length){alert('No items found. Amazon may have changed the wishlist markup.');return}",
+"var j=JSON.stringify(out);",
+"try{await navigator.clipboard.writeText(j)}catch(e){var t=document.createElement('textarea');t.value=j;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}",
+"alert('Copied '+out.length+' items. Return to the wheel and press Paste JSON.')",
+"})()"].join("");
+$("bm").value=BM;
+$("copybm").addEventListener("click",function(){
+var el=$("bm"),done=function(m){$("bmstatus").textContent=m};
+(navigator.clipboard?navigator.clipboard.writeText(BM):Promise.reject()).catch(function(){el.focus();el.select();if(!document.execCommand("copy"))throw 0}).then(function(){done("Copied.")},function(){done("Select the text and copy it manually.")});
+});
+window.addEventListener("resize",resize);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+
+$("json").value=JSON.stringify(SAMPLE,null,2);
+build();resize();
+})();
+</script>
+</body>
+</html>
